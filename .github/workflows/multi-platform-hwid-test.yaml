@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-linux-ubuntu-latest:
-    runs-on: ubuntu-latest
+  run-windows-2025:
+    runs-on: windows-2025
     steps: &hwid-steps
       - uses: actions/checkout@v4
 
@@ -17,6 +17,28 @@ jobs:
       - name: Run
         run: dotnet run --project ./Hwid.Demo/Hwid.Demo.csproj
 
-  run-windows-latest:
-    runs-on: windows-latest
+  run-windows-2022:
+    runs-on: windows-2022
+    steps: *hwid-steps
+    
+# Will not work due to lack of permissions:    
+#  run-ubuntu-24-04:
+#    runs-on: ubuntu-24.04
+#    steps: *hwid-steps
+    
+# Will not work due to lack of permissions:   
+#  run-ubuntu-22-04:
+#    runs-on: ubuntu-22.04
+#    steps: *hwid-steps
+
+  run-macos-26-arm64:
+    runs-on: macos-26
+    steps: *hwid-steps
+
+  run-macos-15-arm64:
+    runs-on: macos-15
+    steps: *hwid-steps
+
+  run-macos-14-arm64:
+    runs-on: macos-14
     steps: *hwid-steps

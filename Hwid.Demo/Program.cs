@@ -12,14 +12,6 @@ namespace Majipro.Hwid.Demo
         static async Task Main(string[] args)
         {
             var host = Host.CreateDefaultBuilder()
-                .ConfigureLogging(logging =>
-                {
-                    logging.AddSimpleConsole(options =>
-                    {
-                        options.IncludeScopes = true;
-                        options.SingleLine = true;
-                    });
-                })
                 .ConfigureServices((_, services) =>
                 {
                     services.AddHwid();
@@ -27,15 +19,22 @@ namespace Majipro.Hwid.Demo
                 .Build();
 
             var hwidAccessor = host.Services.GetRequiredService<IHwidAccessorService>();
-            var logger = host.Services.GetRequiredService<ILogger<Program>>();
 
-            using (logger.BeginScope(RuntimeInformation.OSDescription))
+            Console.WriteLine($"Running on '{RuntimeInformation.OSDescription}'");
+            
+            string hwidAsync = await hwidAccessor.GetHwidAsync();
+            Console.WriteLine($"HWID produced by '{nameof(hwidAccessor.GetHwidAsync)}': '{hwidAsync}'");
+            
+            string hwid = hwidAccessor.GetHwid();
+            Console.WriteLine($"HWID produced by '{nameof(hwidAccessor.GetHwid)}': '{hwid}'");
+
+            if (hwidAsync == hwid && hwidAsync?.Length > 5 && hwid?.Length > 5)
             {
-                string hwid1 = await hwidAccessor.GetHwidAsync();
-                logger.LogInformation("Result of '{MethodCall}': '{Hwid}'", nameof(hwidAccessor.GetHwidAsync), hwid1);
-                
-                string hwid2 = await hwidAccessor.GetHwidAsync();
-                logger.LogInformation("Result of '{MethodCall}': '{Hwid}'", nameof(hwidAccessor.GetHwid), hwid2);
+                Console.WriteLine("Test passed.");
+            }
+            else
+            {
+                await Console.Error.WriteLineAsync("HWID is invalid.");
             }
         }
     }

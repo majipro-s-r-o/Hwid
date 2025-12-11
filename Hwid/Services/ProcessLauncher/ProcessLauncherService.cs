@@ -3,11 +3,20 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Majipro.Hwid.Services.HwidOptions;
+using Majipro.Hwid.Services.Runtime;
 
 namespace Majipro.Hwid.Services.ProcessLauncher;
 
 internal sealed class ProcessLauncherService : IProcessLauncherService
 {
+    private readonly IHwidOptionsService _hwidOptionsService;
+
+    public ProcessLauncherService(IHwidOptionsService hwidOptionsService)
+    {
+        _hwidOptionsService = hwidOptionsService;
+    }
+
     public async IAsyncEnumerable<string> LaunchProcessAsync([EnumeratorCancellation] CancellationToken cancellationToken, string command, params string[] args)
     {
         using var process = GetProcess(command, args);
@@ -33,7 +42,7 @@ internal sealed class ProcessLauncherService : IProcessLauncherService
             }
         }
 
-        process.WaitForExit(); // TODO: Options
+        WaitForExit(process);
     }
     
     public IEnumerable<string> LaunchProcess(CancellationToken cancellationToken, string command, params string[] args)
@@ -61,7 +70,20 @@ internal sealed class ProcessLauncherService : IProcessLauncherService
             }
         }
 
-        process.WaitForExit(); // TODO: Options
+        WaitForExit(process);
+    }
+
+    private void WaitForExit(Process process)
+    {
+        if (_hwidOptionsService.ProcessTimeout == null)
+        {
+            process.WaitForExit();
+        }
+        else
+        {
+            int ms = Convert.ToInt32(Math.Abs(_hwidOptionsService.ProcessTimeout.Value.TotalMilliseconds));
+            process.WaitForExit(ms);
+        }
     }
     
     private Process GetProcess(string command, params string[] args)

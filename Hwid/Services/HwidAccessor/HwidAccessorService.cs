@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Majipro.Hwid.Services.ProcessLauncher;
+using Majipro.Hwid.Services.Runtime;
 
 namespace Majipro.Hwid.Services.HwidAccessor;
 
@@ -14,15 +14,29 @@ internal sealed class HwidAccessorService : IHwidAccessorService
 {
     private readonly IEnumerable<IHwidProvisionService> _hwidProvisionServices;
     private readonly IProcessLauncherService _processLauncherService;
+    private readonly IRuntimeService _runtimeService;
 
-    public HwidAccessorService(IEnumerable<IHwidProvisionService> hwidProvisionServices, IProcessLauncherService processLauncherService)
+    private readonly object _lock = new();
+    
+    private string _hwid = null;
+
+    public HwidAccessorService(
+        IEnumerable<IHwidProvisionService> hwidProvisionServices,
+        IProcessLauncherService processLauncherService,
+        IRuntimeService runtimeService)
     {
         _hwidProvisionServices = hwidProvisionServices;
         _processLauncherService = processLauncherService;
+        _runtimeService = runtimeService;
     }
 
     public async ValueTask<string> GetHwidAsync(CancellationToken cancellationToken = default)
     {
+        if (_hwid != null)
+        {
+            return _hwid;
+        }
+        
         var provisioningService = ResolveProvisioningServiceByPlatform();
 
         var rows = _processLauncherService.LaunchProcessAsync(cancellationToken, provisioningService.Command, provisioningService.Args);
@@ -31,7 +45,7 @@ internal sealed class HwidAccessorService : IHwidAccessorService
         {
             if (provisioningService.ParseHwidFromStdOut(row, out string hwid))
             {
-                return GetNormalizedHwid(hwid);
+                return SetHwid(hwid);
             }
         }
         
@@ -40,6 +54,11 @@ internal sealed class HwidAccessorService : IHwidAccessorService
 
     public string GetHwid(CancellationToken cancellationToken = default)
     {
+        if (_hwid != null)
+        {
+            return _hwid;
+        }
+        
         var provisioningService = ResolveProvisioningServiceByPlatform();
 
         var rows = _processLauncherService.LaunchProcess(cancellationToken, provisioningService.Command, provisioningService.Args);
@@ -48,7 +67,7 @@ internal sealed class HwidAccessorService : IHwidAccessorService
         {
             if (provisioningService.ParseHwidFromStdOut(row, out string hwid))
             {
-                return GetNormalizedHwid(hwid);
+                return SetHwid(hwid);
             }
         }
         
@@ -70,10 +89,22 @@ internal sealed class HwidAccessorService : IHwidAccessorService
         return sb.ToString();
     }
 
+    private string SetHwid(string hwid)
+    {
+        string normalizedHwid = GetNormalizedHwid(hwid);
+
+        lock (_lock)
+        {
+            _hwid = normalizedHwid;
+        }
+
+        return _hwid;
+    }
+
     private IHwidProvisionService ResolveProvisioningServiceByPlatform()
     {
         var hwidProvisioningService = _hwidProvisionServices
-            .LastOrDefault(s => RuntimeInformation.IsOSPlatform(s.Platform));
+            .LastOrDefault(s => _runtimeService.IsOSPlatform(s.Platform));
 
         if (hwidProvisioningService == null)
         {
